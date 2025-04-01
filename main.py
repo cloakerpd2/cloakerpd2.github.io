@@ -1,29 +1,3 @@
-"""import asyncio
-import pygame
-
-pygame.init()
-pygame.display.set_mode((320, 240))
-clock = pygame.time.Clock()
-
-
-async def main():
-    count = 60
-
-    while True:
-        print(f"{count}: Hello from Pygame")
-        pygame.display.update()
-        await asyncio.sleep(0)  # You must include this statement in your main loop. Keep the argument at 0.
-
-        if not count:
-            pygame.quit()
-            return
-        
-        count -= 1
-        clock.tick(60)
-
-asyncio.run(main())
-
-"""
 import pygame
 import time
 import random
@@ -56,7 +30,7 @@ async def main():
     lines = 0
     score = 0
     global font
-    font = pygame.font.Font(None,20)
+    font = pygame.font.Font(None,16)
     
     LINE_SCORES = [0,100,300,500,800]
     LEVEL_GRAV = [48,43,38,33,28,23,18,13,8,6,5,5,5,4,4,4,3,3,3,2,2,2,2,2,2,2,2,2,2,1]
@@ -385,6 +359,15 @@ async def main():
         write(f"Lines: {lines}",(220,60))
         write(f"Score: {score}",(220,110))
         write(f"Grvty: {gravity}",(220,160))
+        write(
+            """Controls: Z -> counterclockwise
+        X -> clockwise
+        C -> 180
+        l/r arrows -> move l/r
+        up arrow -> hard drop
+        down arrow -> soft drop""",
+            (220,210)
+        )
     
         buildBoard()
         
