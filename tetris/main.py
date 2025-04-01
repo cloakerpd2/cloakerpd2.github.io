@@ -6,7 +6,7 @@ import asyncio
 
 
 pygame.init()
-screen = pygame.display.set_mode((400,460))
+screen = pygame.display.set_mode((600,660))
 clock = pygame.time.Clock()
 
 async def main():
