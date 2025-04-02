@@ -2,11 +2,12 @@ import pygame
 import time
 import random
 import asyncio
+import os
 
 
 
 pygame.init()
-screen = pygame.display.set_mode((400,460))
+screen = pygame.display.set_mode((400,660))
 clock = pygame.time.Clock()
 
 async def main():
@@ -71,8 +72,15 @@ async def main():
         [[-1.5,-0.5],[-0.5,-1.5],[-0.5,-0.5],[0.5,-0.5]], #t
         [[-1.5,-1.5],[-0.5,-1.5],[-0.5,-0.5],[0.5,-0.5]] #z
     ]
+
+    buttonFunctions = ["ccw","cw","flip","left","right","hardDrop","softDrop"]
+    buttonRects = []
+    buttonImages = []
     
-    
+    for i in range(7):
+        buttonRects.append(pygame.Rect(35+(i-(((i+1)//4)*3.5))*50,520-((i+1)//4)*50,40,40))
+        buttonImages.append(pygame.image.load(os.path.join('images',f'{buttonFunctions[i]}.png')))
+        
     class Mino:
         def __init__(self, posX, posY, pieceType):
             self.posX = posX
@@ -181,7 +189,8 @@ async def main():
             self.gravityTicker += 1
             localGrav = gravity
             keys = pygame.key.get_pressed()
-            if keys[pygame.K_DOWN]:
+            mousePos = pygame.mouse.get_pos()
+            if keys[pygame.K_DOWN] or (buttonRects[6].collidepoint(mousePos[0],mousePos[1]) and pygame.mouse.get_pressed()[0]):
                 localGrav = gravity / 6
             if self.gravityTicker >= localGrav:
                 self.move(0,self.gravityTicker//localGrav)
@@ -321,6 +330,26 @@ async def main():
             print(gravity)
         score += LINE_SCORES[tempLines] * (level + 1)
             
+    def drawButtons():
+        for i in range(7):
+            screen.blit(buttonImages[i],(buttonRects[i].left,buttonRects[i].top))
+
+    def isInButtons(x,y):
+        if buttonRects[0].collidepoint(x,y):
+            return "ccw"
+        elif buttonRects[1].collidepoint(x,y):
+            return "cw"
+        elif buttonRects[2].collidepoint(x,y):
+            return "flip"
+        elif buttonRects[3].collidepoint(x,y):
+            return "left"
+        elif buttonRects[4].collidepoint(x,y):
+            return "right"
+        elif buttonRects[5].collidepoint(x,y):
+            return "hardDrop"
+        elif buttonRects[6].collidepoint(x,y):
+            return "softDrop"
+        return "none"
     
     fillBag()
     setPiece()
@@ -350,7 +379,28 @@ async def main():
                         mainMino.gravityTicker = gravity / softDropMult
                     case _:
                         pass
-    
+            
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    mousePos = pygame.mouse.get_pos()
+                    match isInButtons(mousePos[0],mousePos[1]):
+                        case "ccw":
+                            mainMino.rotate(3)
+                        case "cw":
+                            mainMino.rotate(1)
+                        case "flip":
+                            mainMino.rotate(2)
+                        case "left":
+                            mainMino.move(-1,0)
+                        case "right":
+                            mainMino.move(1,0)
+                        case "hardDrop":
+                            hardDrop()
+                        case "softDrop":
+                            mainMino.gravityTicker = gravity / softDropMult
+                        case _:
+                            pass
+
         screen.fill("black")
     
         mainMino.tickGravity()
@@ -368,7 +418,9 @@ async def main():
         down arrow -> soft drop""",
             (220,210)
         )
-    
+           
+        drawButtons()
+        
         buildBoard()
         
         pygame.display.update()
