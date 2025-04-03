@@ -11,6 +11,7 @@ screen = pygame.display.set_mode((400,660))
 clock = pygame.time.Clock()
 
 async def main():
+    
     global running
     running = True
 
@@ -21,15 +22,21 @@ async def main():
     
     board = [[0 for _ in range(10)] for _ in range(22)]
     bag = []
+
     global gravity
     gravity = 48 # frames per drop
     softDropMult = 6
+
+    global hold
+    hold = -1
+    
     global score
     global level
     global lines
     level = 0
     lines = 0
     score = 0
+    
     global font
     font = pygame.font.Font(None,16)
     
@@ -73,13 +80,13 @@ async def main():
         [[-1.5,-1.5],[-0.5,-1.5],[-0.5,-0.5],[0.5,-0.5]] #z
     ]
 
-    buttonFunctions = ["ccw","cw","flip","left","right","hardDrop","softDrop"]
+    buttonFunctions = ["ccw","cw","flip","hold","left","right","hardDrop","softDrop"]
     buttonRects = []
     buttonImages = []
     
-    for i in range(7):
-        buttonRects.append(pygame.Rect(35+(i-(((i+1)//4)*3.5))*50,520-((i+1)//4)*50,40,40))
-        buttonImages.append(pygame.image.load(os.path.join('images',f'{buttonFunctions[i]}.png')))
+    for i in range(8):
+        buttonRects.append(pygame.Rect(10+(i*100)-((i//4)*400),570-(i//4)*100,80,80))
+        buttonImages.append(pygame.transform.scale_by(pygame.image.load(os.path.join('images',f'{buttonFunctions[i]}.png')),2))
         
     class Mino:
         def __init__(self, posX, posY, pieceType):
@@ -97,12 +104,12 @@ async def main():
         def __str__(self):
             return f"PosX {self.posX}, PosY {self.posY}, piecetype {self.pieceType}, gravityticker {self.gravityTicker}"
         
-        def drawSelf(self,x,y):
+        def drawSelf(self,x,y,color):
             for block in self.matrix:
                 globalPosX = block[0] * SEGMENT_WIDTH + x
                 globalPosY = block[1] * SEGMENT_WIDTH + y
                 blockRect = pygame.Rect(globalPosX + SEGMENT_BORDER, globalPosY + SEGMENT_BORDER, SEGMENT_WIDTH, SEGMENT_WIDTH)
-                pygame.draw.rect(screen, "red", blockRect, SEGMENT_WIDTH, 4)
+                pygame.draw.rect(screen, color, blockRect, SEGMENT_WIDTH, 4)
     
         def addToBoard(self):
             for block in self.matrix:
@@ -190,13 +197,14 @@ async def main():
             localGrav = gravity
             keys = pygame.key.get_pressed()
             mousePos = pygame.mouse.get_pos()
-            if keys[pygame.K_DOWN] or (buttonRects[6].collidepoint(mousePos[0],mousePos[1]) and pygame.mouse.get_pressed()[0]):
+            if keys[pygame.K_DOWN] or (buttonRects[7].collidepoint(mousePos[0],mousePos[1]) and pygame.mouse.get_pressed()[0]):
                 localGrav = gravity / 6
             if self.gravityTicker >= localGrav:
-                self.move(0,self.gravityTicker//localGrav)
-                self.gravityTicker -= localGrav
-                if localGrav < gravity:
-                    score += 1
+                while self.gravityTicker > localGrav:
+                    self.move(0,1)
+                    self.gravityTicker -= localGrav
+                    if localGrav < gravity:
+                        score += 1
     
         def isMoveValid(self,dx,dy,newMatrix = None):
             sameMatrix = False
@@ -243,34 +251,35 @@ async def main():
         def setPos(self,x,y,newMatrix = None):
             if newMatrix is None:
                 newMatrix = self.matrix
+
+    def getColor(i):
+        color = ""
+        match(i):
+            case -1:
+                color = "darkgray"
+            case 0: 
+                color = "gray"
+            case 1: 
+                color = "cyan"
+            case 2: 
+                color = "blue"
+            case 3: 
+                color = "orange"
+            case 4: 
+                color = "yellow"
+            case 5: 
+                color = "lime"
+            case 6: 
+                color = "purple"
+            case 7: 
+                color = "red"
+        return color
     
     def buildBoard():
         topCorner = 10
         for rowIdx in range(22):
             for colIdx in range(10):
-                color = ""
-                borderColor = ""
-                match(board[rowIdx][colIdx]):
-                    case -1:
-                        color = "darkgray"
-                    case 0: 
-                        color = "gray"
-                    case 1: 
-                        color = "cyan"
-                    case 2: 
-                        color = "blue"
-                    case 3: 
-                        color = "orange"
-                    case 4: 
-                        color = "yellow"
-                    case 5: 
-                        color = "lime"
-                    case 6: 
-                        color = "purple"
-                    case 7: 
-                        color = "red"
-                    case _:
-                        raise Exception("Invalid color detected in board")
+                color = getColor(board[rowIdx][colIdx])
                 blockRect = pygame.Rect(colIdx * SEGMENT_WIDTH + topCorner, rowIdx * SEGMENT_WIDTH + topCorner, SEGMENT_WIDTH, SEGMENT_WIDTH)
                 pygame.draw.rect(screen, color, blockRect, SEGMENT_WIDTH, 4)
     
@@ -298,10 +307,64 @@ async def main():
     
     def setPiece():
         global mainMino
+        global hasHeld
         mainMino = Mino(-1,-1,bag.pop(0))
         mainMino.addInitial()
         if len(bag) < 7:
             fillBag()
+        hasHeld = False
+
+    def renderNextQueue():
+        for i in range(4):
+            tempMino = Mino(-1,-1,bag[i])
+            tempMino.drawSelf(355,260+60*i,getColor(tempMino.pieceType+1))
+            tempMino = None
+
+    def renderHold():
+        tempMino = None
+        if hold == -1:
+            write("None", (230,260))
+        else:
+            tempMino = Mino(-1,-1,hold)
+            if hasHeld:
+                color = "gray"
+            else:
+                color = getColor(hold+1)
+            tempMino.drawSelf(265,260,color)
+
+    def renderGhostPiece():
+        mainMino.removeFromBoard()
+        dy = 0
+        while mainMino.isMoveValid(0,dy) == "good":
+            dy += 1
+        x = mainMino.posX * 20 + 9
+        y = (mainMino.posY + dy - 1) * 20 + 9
+        mainMino.drawSelf(x,y,"darkgrey")
+        mainMino.addToBoard()
+        renderPiece()
+
+    def renderPiece():
+        x = mainMino.posX * 20 + 9
+        y = mainMino.posY * 20 + 9
+        mainMino.drawSelf(x,y,getColor(mainMino.pieceType+1))
+
+    def holdPiece():
+        global hold
+        global hasHeld
+        global mainMino
+        if not hasHeld:
+            hasHeld = True
+            temp = mainMino.pieceType
+            if hold == -1:
+                mainMino.removeFromBoard()
+                hold = temp
+                setPiece()
+                hasHeld = True
+            else:
+                mainMino.removeFromBoard()
+                mainMino = Mino(-1,-1,hold)
+                mainMino.addInitial()
+                hold = temp
     
     def write(text,location,color=(255,255,255)):
         screen.blit(font.render(text,True,color),location)
@@ -331,7 +394,7 @@ async def main():
         score += LINE_SCORES[tempLines] * (level + 1)
             
     def drawButtons():
-        for i in range(7):
+        for i in range(8):
             screen.blit(buttonImages[i],(buttonRects[i].left,buttonRects[i].top))
 
     def isInButtons(x,y):
@@ -342,12 +405,14 @@ async def main():
         elif buttonRects[2].collidepoint(x,y):
             return "flip"
         elif buttonRects[3].collidepoint(x,y):
-            return "left"
+            return "hold"
         elif buttonRects[4].collidepoint(x,y):
-            return "right"
+            return "left"
         elif buttonRects[5].collidepoint(x,y):
-            return "hardDrop"
+            return "right"
         elif buttonRects[6].collidepoint(x,y):
+            return "hardDrop"
+        elif buttonRects[7].collidepoint(x,y):
             return "softDrop"
         return "none"
     
@@ -377,6 +442,8 @@ async def main():
                         hardDrop()
                     case pygame.K_DOWN:
                         mainMino.gravityTicker = gravity / softDropMult
+                    case pygame.K_a:
+                        holdPiece()
                     case _:
                         pass
             
@@ -398,6 +465,8 @@ async def main():
                             hardDrop()
                         case "softDrop":
                             mainMino.gravityTicker = gravity / softDropMult
+                        case "hold":
+                            holdPiece()
                         case _:
                             pass
 
@@ -405,23 +474,28 @@ async def main():
     
         mainMino.tickGravity()
     
-        write(f"Level: {level}",(220,10))
-        write(f"Lines: {lines}",(220,60))
-        write(f"Score: {score}",(220,110))
-        write(f"Grvty: {gravity}",(220,160))
-        write(
-            """Controls: Z -> counterclockwise
-        X -> clockwise
-        C -> 180
-        l/r arrows -> move l/r
-        up arrow -> hard drop
-        down arrow -> soft drop""",
-            (220,210)
-        )
-           
+        write(f"{f"Level: {level}".ljust(16)}Gravity: {gravity}",(220,10))
+        write(f"{f"Lines: {lines}".ljust(16)}Score: {score}",(220,25))
+        write("Controls:",(220,40))
+        write("Z -> counterclockwise",(220,55))
+        write("X -> clockwise",(220,70))
+        write("C -> 180",(220,85))
+        write("l/r arrows -> move l/r",(220,100))
+        write("up arrow -> hard drop",(220,115))
+        write("down arrow -> soft drop",(220,130))
+        write("a -> hold",(220,145))
+        write("Held piece:",(230,215))
+        write("Next pieces:",(320,215))
+
+        renderNextQueue()
+
+        renderHold()
+        
         drawButtons()
         
         buildBoard()
+
+        renderGhostPiece()
         
         pygame.display.update()
     
